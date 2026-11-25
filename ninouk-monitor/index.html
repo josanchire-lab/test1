@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ninouk monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital@0;1&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<style>
+:root{--font-anthropic-sans:Inter,system-ui,-apple-system,'Segoe UI',sans-serif;--cds-pad-md:14px;--cds-pad-lg:20px;--cds-pad-xl:32px;--cds-gap-xs:6px;--cds-gap-sm:10px;--cds-gap-md:16px;--cds-gap-lg:24px;--cds-radius:12px;--cds-font-size-caption:0.8125rem;--cds-font-size-body:0.9375rem;--cds-font-weight-medium:500}
+html,body{margin:0;background:#0d0d0d}
+.dash-skeleton{color:transparent;background:rgba(255,255,255,0.06);border-radius:4px}
+.pv{--font-anthropic-serif:'EB Garamond',Garamond,Georgia,serif;color-scheme:dark;--pv-accent:#b39dff;--pv-vix:#d95926;--pv-warn:#ff9a4d;--pv-alert:#ff5ec4;--color-panel:#1a1a19;--color-fg:#f0efec;--color-fg-muted:#a3a29a;--color-border-line:rgba(255,255,255,0.10);--cds-text-secondary:#c3c2b7;--cds-chart-muted:#6b6a65;--cds-chart-grid:#2c2c2a;--cds-chart-axis:#383835;--cds-chart-reference:#898781;--cds-surface-popover:#262624;--cds-border:rgba(255,255,255,0.14);--cds-shadow-popover:0 6px 20px rgba(0,0,0,0.5);background:#0d0d0d;padding:var(--cds-pad-xl) var(--cds-pad-lg);min-height:100vh;box-sizing:border-box;display:grid;gap:var(--cds-gap-lg);align-content:start;font-family:var(--font-anthropic-sans);color:var(--color-fg);min-width:0;max-width:1100px;margin:0 auto;-webkit-font-smoothing:antialiased}
+.pv h1{margin:0;font-family:var(--font-anthropic-serif);font-weight:400;font-size:clamp(1.9rem,1.2rem + 2vw,2.6rem);line-height:1.1;letter-spacing:-0.015em;color:var(--pv-accent)}
+.pv h1 em{font-style:italic}
+.pv h2{margin:0;font-family:var(--font-anthropic-serif);font-size:1.45rem;font-weight:400;line-height:1.2;letter-spacing:-0.005em}
+.pv p{margin:0}
+.pv-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--cds-gap-md)}
+.pv-card{background:var(--color-panel);border:1px solid var(--color-border-line);border-radius:var(--cds-radius);padding:var(--cds-pad-lg);min-width:0;display:grid;gap:var(--cds-gap-xs);align-content:start}
+.pv-label{font-size:var(--cds-font-size-caption);color:var(--color-fg-muted)}
+.pv-value{color:var(--pv-accent);font-family:var(--font-anthropic-serif);font-weight:400;font-size:clamp(1.7rem,0.95rem + 2vw,2.35rem);line-height:1.1;letter-spacing:-0.01em;white-space:nowrap}
+.pv-sub{font-size:var(--cds-font-size-caption);color:var(--color-fg-muted);line-height:1.45}
+.pv-head{display:flex;flex-wrap:wrap;gap:var(--cds-gap-sm);align-items:center;justify-content:space-between}
+.pv-legend{display:flex;flex-wrap:wrap;gap:var(--cds-gap-xs) var(--cds-gap-md);font-size:var(--cds-font-size-caption);color:var(--cds-text-secondary);margin-bottom:var(--cds-gap-xs)}
+.pv-chart{position:relative;min-height:130px;margin-top:var(--cds-gap-sm)}
+.pv-chart-lg{min-height:230px}
+.pv-chart svg{display:block;width:100%;height:auto;overflow:visible}
+.pv-chart text{font-family:var(--font-anthropic-sans)}
+.pv-name{font-size:12px;fill:var(--cds-text-secondary)}
+.pv-val{font-size:13px;font-weight:500;fill:var(--color-fg)}
+.pv-tick{font-size:11px;fill:var(--cds-text-secondary)}
+.pv-tip{position:absolute;pointer-events:none;z-index:2;background:var(--cds-surface-popover);border:1px solid var(--cds-border);box-shadow:var(--cds-shadow-popover);color:var(--cds-text-secondary);border-radius:8px;padding:6px 10px;font-size:var(--cds-font-size-caption);white-space:nowrap}
+.pv-tip-h{color:var(--color-fg);font-weight:500}
+.pv-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:var(--cds-gap-md) var(--cds-gap-lg);margin:var(--cds-gap-sm) 0 0}
+.pv-facts div{min-width:0}
+.pv-facts dt{font-size:var(--cds-font-size-caption);color:var(--color-fg-muted)}
+.pv-facts dd{margin:2px 0 0;font-size:var(--cds-font-size-body);color:var(--color-fg);overflow-wrap:anywhere}
+.pv-facts dd small{display:block;font-size:var(--cds-font-size-caption);color:var(--color-fg-muted)}
+.pv-top{display:flex;flex-wrap:wrap;gap:var(--cds-gap-sm);align-items:baseline;justify-content:space-between}
+.pv-asof{font-size:var(--cds-font-size-caption);color:var(--color-fg-muted)}
+.pv-h3{margin:var(--cds-gap-md) 0 0;font-family:var(--font-anthropic-serif);font-size:1.2rem;font-weight:400}
+.pv-chart-regions{min-height:90px}
+.pv-seg-legend{list-style:none;margin:var(--cds-gap-md) 0 0;padding:0;display:flex;flex-wrap:wrap;gap:8px 20px}
+.pv-seg-legend li{display:inline-flex;align-items:center;gap:7px;font-size:var(--cds-font-size-caption);color:var(--cds-text-secondary);cursor:default}
+.pv-seg-legend li.is-dim{opacity:.4}
+.pv-seg-legend i{width:9px;height:9px;border-radius:50%}
+.pv-seg-legend b{font-family:var(--font-anthropic-serif);font-weight:400;font-size:1.05rem;color:var(--color-fg);font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion:no-preference){.pv-chart-regions rect,.pv-seg-legend li{transition:opacity .2s}}
+.pv-ddcards{margin-top:var(--cds-gap-sm);min-height:110px}
+.pv-ddcards .pv-card{background:#141413}
+.pv-ctrls{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center}
+.pv-range{display:inline-flex;gap:2px;padding:2px;border-radius:999px;background:rgba(255,255,255,0.06)}
+.pv-range button{font:inherit;font-size:var(--cds-font-size-caption);font-weight:var(--cds-font-weight-medium);color:var(--cds-text-secondary);background:transparent;border:0;border-radius:999px;padding:5px 11px;min-width:40px;cursor:pointer}
+.pv-range button[aria-pressed='true']{background:var(--pv-accent);color:#0b0b0b}
+.pv-range button:focus-visible{outline:2px solid var(--pv-accent);outline-offset:2px}
+@media (pointer:coarse){.pv-range button{min-height:36px;padding:8px 13px}}
+.pv-chart-sm{min-height:104px;margin-top:var(--cds-gap-xs)}
+.pv-foot{font-size:var(--cds-font-size-caption);color:var(--color-fg-muted);line-height:1.5}
+@media (max-width:600px){.pv{padding:var(--cds-pad-lg) var(--cds-pad-md);gap:var(--cds-gap-md)}.pv-card{padding:var(--cds-pad-md)}.pv-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--cds-gap-sm)}.pv-value{font-size:clamp(1.35rem,0.9rem + 2.6vw,1.7rem)}.pv-facts{grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--cds-gap-sm) var(--cds-gap-md)}.pv-seg-legend{gap:6px 14px}.pv-head{align-items:flex-start}}
+@media (max-width:360px){.pv-kpis,.pv-facts{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class='pv'>
+<div class='pv-top'>
+<h1 id='title'>Ninouk <em>monitor</em></h1>
+<p class='pv-asof'>Data as of 25 Nov 2026</p>
+</div>
+<section class='pv-card' id='market-phase'>
+<h2>VWCE Market phase</h2>
+<div class='pv-chart pv-chart-sm' data-draw='phasebar'></div>
+</section>
+<section class='pv-card' id='price-vs-high'>
+<div class='pv-head'>
+<h2>Price vs the 52-week high</h2>
+<div class='pv-ctrls'><div class='pv-range' role='group' aria-label='Time range'><button type='button' data-range='1m' aria-pressed='false'>1M</button><button type='button' data-range='ytd' aria-pressed='false'>YTD</button><button type='button' data-range='1y' aria-pressed='true'>1Y</button><button type='button' data-range='2y' aria-pressed='false'>2Y</button></div></div>
+</div>
+<p class='pv-sub'>Closing price on Xetra. The faint lines mark 5% and 10% below the 52-week high. The 2Y view uses weekly closes before Nov 2025.</p>
+<div class='pv-chart pv-chart-lg' data-draw='pricechart'></div>
+</section>
+<section class='pv-card' id='fund-facts'>
+<h2>About VWCE</h2>
+<p class='pv-sub'><span data-draw='num' data-source='facts' data-field='name' data-fmt='text'></span> · source: Vanguard Europe, read <span data-draw='num' data-source='facts' data-field='retrieved' data-fmt='dmy'></span></p>
+<dl class='pv-facts'>
+<div><dt>Max drawdown since 2019</dt><dd><span data-draw='num' data-source='maxdd' data-field='max_drawdown' data-fmt='pct1s'></span><small><span data-draw='num' data-source='maxdd' data-field='event' data-fmt='text'></span>: <span data-draw='num' data-source='maxdd' data-field='peak_date' data-fmt='dmy'></span> → <span data-draw='num' data-source='maxdd' data-field='trough_date' data-fmt='dmy'></span>, on closes · recovered by <span data-draw='num' data-source='maxdd' data-field='recovered' data-fmt='my'></span></small></dd></div>
+<div><dt>Worst single day since 2019</dt><dd><span data-draw='num' data-source='maxdd' data-field='worst_day' data-fmt='pct1s'></span><small>on <span data-draw='num' data-source='maxdd' data-field='worst_day_date' data-fmt='dmy'></span></small></dd></div>
+<div><dt>TER</dt><dd><span data-draw='num' data-source='facts' data-field='ter' data-fmt='pct2'></span><small>a year</small></dd></div>
+<div><dt>Share class AuM</dt><dd><span data-draw='num' data-source='facts' data-field='share_class_aum_usd' data-fmt='usdB'></span><small>accumulating class (VWCE)</small></dd></div>
+<div><dt>Holdings</dt><dd><span data-draw='num' data-source='facts' data-field='holdings' data-fmt='int'></span><small>of <span data-draw='num' data-source='facts' data-field='index_holdings' data-fmt='int'></span> in the index · <span data-draw='num' data-source='facts' data-field='holdings_date' data-fmt='dmy'></span></small></dd></div>
+<div><dt>Index</dt><dd><span data-draw='num' data-source='facts' data-field='index' data-fmt='text'></span></dd></div>
+<div><dt>Replication</dt><dd><span data-draw='num' data-source='facts' data-field='replication' data-fmt='text'></span></dd></div>
+<div><dt>Distribution</dt><dd><span data-draw='num' data-source='facts' data-field='distribution' data-fmt='text'></span></dd></div>
+<div><dt>Domicile</dt><dd><span data-draw='num' data-source='facts' data-field='domicile' data-fmt='text'></span></dd></div>
+<div><dt>Fund currency</dt><dd><span data-draw='num' data-source='facts' data-field='base_currency' data-fmt='text'></span><small>traded in <span data-draw='num' data-source='facts' data-field='trading_currency' data-fmt='text'></span> on Xetra</small></dd></div>
+<div><dt>Launched</dt><dd><span data-draw='num' data-source='facts' data-field='inception_date' data-fmt='dmy'></span></dd></div>
+<div><dt>ISIN</dt><dd><span data-draw='num' data-source='facts' data-field='isin' data-fmt='text'></span></dd></div>
+<div><dt>Exchange</dt><dd><span data-draw='num' data-source='facts' data-field='exchange' data-fmt='text'></span><small>ticker <span data-draw='num' data-source='facts' data-field='ticker' data-fmt='text'></span></small></dd></div>
+</dl>
+</section>
+<section class='pv-card' id='ftse-index'>
+<h2>FTSE All-World Index</h2>
+<p class='pv-sub'>The index VWCE tracks · FTSE Russell factsheet, <span data-draw='num' data-source='ftse_facts' data-field='facts_date' data-fmt='dmy'></span></p>
+<dl class='pv-facts'>
+<div><dt>Constituents</dt><dd><span data-draw='num' data-source='ftse_facts' data-field='constituents' data-fmt='int'></span><small><span data-draw='num' data-source='ftse_facts' data-field='developed' data-fmt='int'></span> developed · <span data-draw='num' data-source='ftse_facts' data-field='emerging' data-fmt='int'></span> emerging</small></dd></div>
+<div><dt>Countries</dt><dd><span data-draw='num' data-source='ftse_facts' data-field='countries' data-fmt='int'></span><small>large and mid caps</small></dd></div>
+<div><dt>Largest holding</dt><dd><span data-draw='num' data-source='ftse_facts' data-field='largest' data-fmt='text'></span><small><span data-draw='num' data-source='ftse_facts' data-field='largest_weight' data-fmt='pct2'></span> of the index</small></dd></div>
+<div><dt>Dividend yield</dt><dd><span data-draw='num' data-source='ftse_facts' data-field='dividend_yield' data-fmt='pct2'></span></dd></div>
+<div><dt>Index reviews</dt><dd><span data-draw='num' data-source='ftse_facts' data-field='reviews' data-fmt='text'></span></dd></div>
+</dl>
+<h3 class='pv-h3' id='geography'>Geographic breakdown</h3>
+<p class='pv-sub'>Share of the index by market value · FTSE Russell, 30 Oct 2026</p>
+<div class='pv-chart pv-chart-regions' data-draw='ftseregions'></div>
+<h3 class='pv-h3' id='largest-drawdowns'>Largest drawdowns</h3>
+<p class='pv-sub'>Peak to trough, in euros with dividends reinvested, since 1994</p>
+<div class='pv-kpis pv-ddcards' data-draw='ftseddcards'></div>
+<p class='pv-sub'>Before 2019 the figures are the index on month-end data (Vanguard), which smooths the lows. Since 2019 they are VWCE on Xetra, daily closes.</p>
+</section>
+<p class='pv-foot'>Static snapshot. Sources: VWCE.DE prices from Yahoo Finance and stockanalysis.com (Xetra, EUR); fund facts from Vanguard Europe; index facts from FTSE Russell. Not investment advice.</p>
+</div>
+<script>
+const DATA={"prices":[{"date":"2025-11-24","close":142.46},{"date":"2025-11-25","close":142.8},{"date":"2025-11-26","close":144.42},{"date":"2025-11-27","close":144.26},{"date":"2025-11-28","close":144.84},{"date":"2025-12-01","close":144.3},{"date":"2025-12-02","close":144.26},{"date":"2025-12-03","close":144.18},{"date":"2025-12-04","close":144.54},{"date":"2025-12-05","close":145.16},{"date":"2025-12-08","close":144.9},{"date":"2025-12-09","close":144.98},{"date":"2025-12-10","close":144.72},{"date":"2025-12-11","close":144.08},{"date":"2025-12-12","close":143.18},{"date":"2025-12-15","close":143.46},{"date":"2025-12-16","close":142.44},{"date":"2025-12-17","close":141.8},{"date":"2025-12-18","close":143.52},{"date":"2025-12-19","close":144.18},{"date":"2025-12-22","close":144.4},{"date":"2025-12-23","close":144.7},{"date":"2025-12-29","close":144.98},{"date":"2025-12-30","close":145.42},{"date":"2026-01-02","close":145.14},{"date":"2026-01-05","close":147.08},{"date":"2026-01-06","close":147.7},{"date":"2026-01-07","close":148.0},{"date":"2026-01-08","close":147.72},{"date":"2026-01-09","close":148.9},{"date":"2026-01-12","close":149.0},{"date":"2026-01-13","close":149.26},{"date":"2026-01-14","close":148.4},{"date":"2026-01-15","close":150.24},{"date":"2026-01-16","close":149.9},{"date":"2026-01-19","close":148.04},{"date":"2026-01-20","close":146.66},{"date":"2026-01-21","close":147.0},{"date":"2026-01-22","close":147.98},{"date":"2026-01-23","close":147.72},{"date":"2026-01-26","close":147.24},{"date":"2026-01-27","close":147.16},{"date":"2026-01-28","close":147.38},{"date":"2026-01-29","close":146.14},{"date":"2026-01-30","close":147.22},{"date":"2026-02-02","close":148.54},{"date":"2026-02-03","close":148.1},{"date":"2026-02-04","close":147.76},{"date":"2026-02-05","close":146.5},{"date":"2026-02-06","close":147.82},{"date":"2026-02-09","close":148.54},{"date":"2026-02-10","close":148.9},{"date":"2026-02-11","close":149.08},{"date":"2026-02-12","close":147.84},{"date":"2026-02-13","close":147.7},{"date":"2026-02-16","close":147.54},{"date":"2026-02-17","close":147.82},{"date":"2026-02-18","close":149.5},{"date":"2026-02-19","close":149.16},{"date":"2026-02-20","close":149.88},{"date":"2026-02-23","close":148.82},{"date":"2026-02-24","close":149.72},{"date":"2026-02-25","close":150.86},{"date":"2026-02-26","close":150.42},{"date":"2026-02-27","close":149.82},{"date":"2026-03-02","close":150.02},{"date":"2026-03-03","close":147.68},{"date":"2026-03-04","close":149.3},{"date":"2026-03-05","close":148.34},{"date":"2026-03-09","close":146.4},{"date":"2026-03-10","close":148.54},{"date":"2026-03-11","close":148.0},{"date":"2026-03-12","close":146.96},{"date":"2026-03-13","close":146.78},{"date":"2026-03-16","close":147.38},{"date":"2026-03-17","close":147.8},{"date":"2026-03-18","close":146.8},{"date":"2026-03-19","close":144.28},{"date":"2026-03-20","close":142.64},{"date":"2026-03-23","close":143.34},{"date":"2026-03-24","close":143.24},{"date":"2026-03-25","close":144.68},{"date":"2026-03-26","close":142.96},{"date":"2026-03-27","close":140.98},{"date":"2026-03-30","close":141.9},{"date":"2026-03-31","close":141.82},{"date":"2026-04-01","close":144.9},{"date":"2026-04-02","close":144.74},{"date":"2026-04-07","close":143.92},{"date":"2026-04-08","close":148.08},{"date":"2026-04-09","close":148.16},{"date":"2026-04-10","close":148.56},{"date":"2026-04-13","close":148.48},{"date":"2026-04-14","close":150.28},{"date":"2026-04-15","close":150.78},{"date":"2026-04-16","close":151.7},{"date":"2026-04-17","close":153.66},{"date":"2026-04-20","close":152.88},{"date":"2026-04-21","close":152.56},{"date":"2026-04-22","close":153.38},{"date":"2026-04-23","close":153.78},{"date":"2026-04-24","close":153.6},{"date":"2026-04-27","close":153.5},{"date":"2026-04-28","close":152.88},{"date":"2026-04-29","close":153.12},{"date":"2026-04-30","close":153.96},{"date":"2026-05-04","close":154.56},{"date":"2026-05-05","close":155.98},{"date":"2026-05-06","close":158.06},{"date":"2026-05-07","close":157.98},{"date":"2026-05-08","close":158.14},{"date":"2026-05-11","close":158.62},{"date":"2026-05-12","close":156.96},{"date":"2026-05-13","close":159.14},{"date":"2026-05-14","close":161.02},{"date":"2026-05-15","close":159.44},{"date":"2026-05-18","close":158.44},{"date":"2026-05-19","close":158.2},{"date":"2026-05-20","close":159.76},{"date":"2026-05-21","close":159.92},{"date":"2026-05-22","close":161.62},{"date":"2026-05-25","close":162.78},{"date":"2026-05-26","close":162.58},{"date":"2026-05-27","close":162.2},{"date":"2026-05-28","close":162.82},{"date":"2026-05-29","close":163.16},{"date":"2026-06-01","close":163.92},{"date":"2026-06-02","close":164.88},{"date":"2026-06-03","close":164.14},{"date":"2026-06-04","close":163.8},{"date":"2026-06-05","close":162.36},{"date":"2026-06-08","close":161.56},{"date":"2026-06-09","close":159.5},{"date":"2026-06-10","close":159.24},{"date":"2026-06-11","close":159.56},{"date":"2026-06-12","close":162.46},{"date":"2026-06-15","close":164.6},{"date":"2026-06-16","close":164.16},{"date":"2026-06-17","close":164.64},{"date":"2026-06-18","close":165.46},{"date":"2026-06-19","close":165.44},{"date":"2026-06-22","close":166.04},{"date":"2026-06-23","close":163.92},{"date":"2026-06-24","close":164.8},{"date":"2026-06-25","close":164.2},{"date":"2026-06-26","close":163.7},{"date":"2026-06-29","close":163.44},{"date":"2026-06-30","close":165.22},{"date":"2026-07-01","close":165.94},{"date":"2026-07-02","close":164.98},{"date":"2026-07-03","close":165.88},{"date":"2026-07-06","close":166.6},{"date":"2026-07-07","close":164.82},{"date":"2026-07-08","close":163.78},{"date":"2026-07-09","close":165.56},{"date":"2026-07-10","close":166.14},{"date":"2026-07-13","close":165.78},{"date":"2026-07-14","close":165.66},{"date":"2026-07-15","close":165.8},{"date":"2026-07-16","close":165.46},{"date":"2026-07-17","close":163.5},{"date":"2026-07-20","close":164.18},{"date":"2026-07-21","close":165.14},{"date":"2026-07-22","close":165.4},{"date":"2026-07-23","close":163.36},{"date":"2026-07-24","close":164.28},{"date":"2026-07-27","close":163.36},{"date":"2026-07-28","close":163.78},{"date":"2026-07-29","close":162.4},{"date":"2026-07-30","close":162.02},{"date":"2026-07-31","close":162.96},{"date":"2026-08-03","close":165.1},{"date":"2026-08-04","close":167.54},{"date":"2026-08-05","close":168.04},{"date":"2026-08-06","close":167.84},{"date":"2026-08-07","close":168.38},{"date":"2026-08-10","close":168.48},{"date":"2026-08-11","close":168.48},{"date":"2026-08-12","close":168.8},{"date":"2026-08-13","close":169.62},{"date":"2026-08-14","close":168.88},{"date":"2026-08-17","close":169.06},{"date":"2026-08-18","close":166.9},{"date":"2026-08-19","close":166.5},{"date":"2026-08-20","close":165.66},{"date":"2026-08-21","close":166.3},{"date":"2026-08-24","close":165.62},{"date":"2026-08-25","close":166.3},{"date":"2026-08-26","close":166.54},{"date":"2026-08-27","close":167.14},{"date":"2026-08-28","close":168.54},{"date":"2026-08-31","close":166.66},{"date":"2026-09-01","close":166.62},{"date":"2026-09-02","close":166.82},{"date":"2026-09-03","close":168.06},{"date":"2026-09-04","close":167.88},{"date":"2026-09-07","close":167.78},{"date":"2026-09-14","close":166.22},{"date":"2026-09-15","close":165.36},{"date":"2026-09-16","close":166.3},{"date":"2026-09-17","close":167.66},{"date":"2026-09-18","close":167.14},{"date":"2026-09-21","close":169.48},{"date":"2026-09-22","close":170.5},{"date":"2026-09-23","close":170.04},{"date":"2026-09-24","close":168.92},{"date":"2026-09-25","close":169.74},{"date":"2026-09-28","close":169.12},{"date":"2026-09-29","close":169.4},{"date":"2026-09-30","close":169.78},{"date":"2026-10-01","close":169.38},{"date":"2026-10-02","close":171.14},{"date":"2026-10-05","close":172.9},{"date":"2026-10-06","close":173.56},{"date":"2026-10-07","close":172.92},{"date":"2026-10-08","close":171.9},{"date":"2026-10-09","close":172.86},{"date":"2026-10-12","close":173.48},{"date":"2026-10-13","close":172.6},{"date":"2026-10-14","close":172.48},{"date":"2026-10-15","close":170.94},{"date":"2026-10-16","close":170.44},{"date":"2026-10-19","close":170.88},{"date":"2026-10-20","close":170.36},{"date":"2026-10-21","close":171.32},{"date":"2026-10-22","close":169.28},{"date":"2026-10-23","close":169.3},{"date":"2026-10-26","close":170.0},{"date":"2026-10-27","close":171.68},{"date":"2026-10-28","close":171.94},{"date":"2026-10-29","close":171.44},{"date":"2026-10-30","close":168.9},{"date":"2026-11-02","close":169.38},{"date":"2026-11-03","close":168.06},{"date":"2026-11-04","close":169.86},{"date":"2026-11-05","close":165.98},{"date":"2026-11-06","close":165.84},{"date":"2026-11-09","close":167.42},{"date":"2026-11-10","close":167.62},{"date":"2026-11-11","close":170.92},{"date":"2026-11-12","close":171.42},{"date":"2026-11-13","close":169.86},{"date":"2026-11-16","close":169.08},{"date":"2026-11-17","close":165.28},{"date":"2026-11-18","close":165.32},{"date":"2026-11-19","close":164.86},{"date":"2026-11-20","close":159.34},{"date":"2026-11-23","close":165.04},{"date":"2026-11-24","close":161.88}],"prices_weekly":[{"date":"2024-11-15","close":131.36},{"date":"2024-11-22","close":134.82},{"date":"2024-11-29","close":134.56},{"date":"2024-12-06","close":136.04},{"date":"2024-12-13","close":135.78},{"date":"2024-12-20","close":134.06},{"date":"2024-12-27","close":134.36},{"date":"2025-01-03","close":135.24},{"date":"2025-01-10","close":133.72},{"date":"2025-01-17","close":137.02},{"date":"2025-01-24","close":137.14},{"date":"2025-01-31","close":138.86},{"date":"2025-02-07","close":138.66},{"date":"2025-02-14","close":138.7},{"date":"2025-02-21","close":138.98},{"date":"2025-02-28","close":135.82},{"date":"2025-03-07","close":128.4},{"date":"2025-03-14","close":127.08},{"date":"2025-03-21","close":128.38},{"date":"2025-03-28","close":126.9},{"date":"2025-04-04","close":115.8},{"date":"2025-04-11","close":113.92},{"date":"2025-04-18","close":115.82},{"date":"2025-04-25","close":119.8},{"date":"2025-05-02","close":124.14},{"date":"2025-05-09","close":124.94},{"date":"2025-05-16","close":130.7},{"date":"2025-05-23","close":127.14},{"date":"2025-05-30","close":128.48},{"date":"2025-06-06","close":130.18},{"date":"2025-06-13","close":128.58},{"date":"2025-06-20","close":128.04},{"date":"2025-06-27","close":130.1},{"date":"2025-07-04","close":130.28},{"date":"2025-07-11","close":131.28},{"date":"2025-07-18","close":132.58},{"date":"2025-07-25","close":133.4},{"date":"2025-08-01","close":132.04},{"date":"2025-08-08","close":134.2},{"date":"2025-08-15","close":135.48},{"date":"2025-08-22","close":136.4},{"date":"2025-08-29","close":135.48},{"date":"2025-09-05","close":135.56},{"date":"2025-09-12","close":138.34},{"date":"2025-09-19","close":139.04},{"date":"2025-09-26","close":139.06},{"date":"2025-10-03","close":141.66},{"date":"2025-10-10","close":140.12},{"date":"2025-10-17","close":140.1},{"date":"2025-10-24","close":143.0},{"date":"2025-10-31","close":145.54},{"date":"2025-11-07","close":141.54},{"date":"2025-11-14","close":143.68},{"date":"2025-11-21","close":140.8}],"high52":[{"peak":173.96,"peak_date":"2026-10-07","low":140.52,"low_date":"2026-03-23"}],"maxdd":[{"max_drawdown":-0.3343,"peak_date":"2020-02-19","trough_date":"2020-03-23","recovered":"2021-01","event":"COVID crash","worst_day":-0.094,"worst_day_date":"2020-03-12"}],"facts":[{"name":"Vanguard FTSE All-World UCITS ETF (USD) Accumulating","ticker":"VWCE","exchange":"Xetra (Deutsche Börse)","trading_currency":"EUR","isin":"IE00BK5BQT80","ter":0.0014,"share_class_aum_usd":62190000000,"holdings":3574,"index_holdings":4199,"holdings_date":"2026-10-31","index":"FTSE All-World Index","replication":"Physical (sampling)","distribution":"Accumulating","domicile":"Ireland","base_currency":"USD","inception_date":"2019-07-23","retrieved":"2026-11-25"}],"ftse_facts":[{"constituents":4200,"developed":1902,"emerging":2298,"countries":48,"largest":"Nvidia","largest_weight":0.0459,"dividend_yield":0.0163,"facts_date":"2026-10-30","reviews":"Semi-annual, March and September"}],"ftse_dd":[{"episode":"Tech bubble","period":"Sep 2000 – Apr 2003","drawdown":-0.529,"basis":"Index, month-end"},{"episode":"Global Financial Crisis","period":"Nov 2007 – Mar 2009","drawdown":-0.481,"basis":"Index, month-end"},{"episode":"COVID crash","period":"19 Feb – 23 Mar 2020","drawdown":-0.3343,"basis":"VWCE, daily closes"},{"episode":"2025 tariff shock","period":"Feb – Apr 2025","drawdown":-0.2107,"basis":"VWCE, daily closes"},{"episode":"2022 rate-hike sell-off","period":"2022","drawdown":-0.1612,"basis":"VWCE, daily closes"}],"ftse_regions":[{"region":"United States","weight":0.627},{"region":"Developed Europe","weight":0.1368},{"region":"Emerging markets","weight":0.0959},{"region":"Japan","weight":0.0593},{"region":"Others","weight":0.081}]};
+const CALCS={},DRAWS={};
+const dash={
+  calc:(id,o)=>{CALCS[id]=o;},
+  data:(id)=>{if(CALCS[id]){const c=CALCS[id];return{status:'ok',data:c.fn(...c.inputs.map((i)=>DATA[i]))};}return DATA[id]?{status:'ok',data:DATA[id]}:{status:'error',data:[]};},
+  draw:(name,fn)=>{if(fn){DRAWS[name]=fn;return;}document.querySelectorAll(`[data-draw="${name}"]`).forEach((el)=>DRAWS[name](el));}
+};
+const nf=(o)=>new Intl.NumberFormat('en-GB',Object.assign({useGrouping:'always'},o));
+const FMT={eur2:nf({style:'currency',currency:'EUR',minimumFractionDigits:2,maximumFractionDigits:2}),eur0:nf({style:'currency',currency:'EUR',minimumFractionDigits:0,maximumFractionDigits:0}),pct1s:nf({style:'percent',minimumFractionDigits:1,maximumFractionDigits:1,signDisplay:'exceptZero'}),int:nf({maximumFractionDigits:0}),pt2:nf({minimumFractionDigits:2,maximumFractionDigits:2}),pct2:nf({style:'percent',minimumFractionDigits:2,maximumFractionDigits:2}),pct1:nf({style:'percent',minimumFractionDigits:1,maximumFractionDigits:1}),pct0s:nf({style:'percent',maximumFractionDigits:0,signDisplay:'exceptZero'}),usdB:nf({style:'currency',currency:'USD',notation:'compact',minimumFractionDigits:2,maximumFractionDigits:2})};
+const fmt=(k,v)=>FMT[k].format(v).replace('-','−');
+const DAY=new Intl.DateTimeFormat('en-GB',{day:'numeric',month:'short',timeZone:'UTC'});
+const FULL=new Intl.DateTimeFormat('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'});
+const dayFmt=(iso)=>DAY.format(new Date(iso));
+const fullFmt=(iso)=>FULL.format(new Date(iso));
+
+dash.calc('monitor',{inputs:['prices','high52'],fn:(prices,high52)=>{const h=high52[0];const p=prices.slice().sort((a,b)=>a.date<b.date?-1:1);const last=p[p.length-1],prev=p[p.length-2];const day=(s)=>Date.UTC(+s.slice(0,4),+s.slice(5,7)-1,+s.slice(8,10))/864e5;return [{last:last.close,last_date:last.date,prev_close:prev.close,day_change:last.close/prev.close-1,peak:h.peak,peak_date:h.peak_date,from_peak:last.close/h.peak-1,days_since_peak:day(last.date)-day(h.peak_date),at_high:last.close>=h.peak?1:0}];}});
+
+const mkTip=()=>{const t=document.createElement('div');t.className='pv-tip';t.hidden=true;return t;};
+const showTip=(box,t,lines,x,y)=>{t.replaceChildren(...lines.map((s,i)=>{const d=document.createElement('div');d.textContent=s;if(i===0)d.className='pv-tip-h';return d;}));t.hidden=false;const w=t.offsetWidth;t.style.left=Math.max(0,Math.min(box.clientWidth-w,x-w/2))+'px';t.style.top=Math.max(0,y-t.offsetHeight-14)+'px';};
+const isMouse=(ev)=>ev.pointerType==='mouse';
+document.addEventListener('pointerdown',(ev)=>{document.querySelectorAll('.pv-chart').forEach((c)=>{if(c._dismiss&&!c.contains(ev.target))c._dismiss();});});
+let rzT,rzW=window.innerWidth;
+window.addEventListener('resize',()=>{clearTimeout(rzT);rzT=setTimeout(()=>{if(window.innerWidth===rzW)return;rzW=window.innerWidth;['phasebar','pricechart','ftseregions'].forEach((n)=>dash.draw(n));},200);});
+let PV_RANGE='1y';const pvRange=()=>PV_RANGE;
+document.querySelectorAll('[data-range]').forEach((b)=>b.addEventListener('click',()=>{PV_RANGE=b.dataset.range;document.querySelectorAll('[data-range]').forEach((o)=>o.setAttribute('aria-pressed',String(o===b)));dash.draw('pricechart');}));
+
+dash.draw('num',(el)=>{const d=dash.data(el.dataset.source);const row=Number(el.dataset.row)||0;const v=d.status==='ok'&&d.data[row]?d.data[row][el.dataset.field]:null;if(v==null){el.textContent='—';return;}const f=el.dataset.fmt;el.textContent=f==='date'?dayFmt(v):f==='dmy'?fullFmt(v):f==='my'?new Intl.DateTimeFormat('en-GB',{month:'short',year:'numeric',timeZone:'UTC'}).format(new Date(v+'-01')):f==='text'?String(v):fmt(f,v);});
+
+dash.calc('phase',{inputs:['prices','high52'],fn:(prices,high52)=>{const peak=high52[0].peak;const p=prices.slice().sort((a,b)=>a.date<b.date?-1:1);const last=p[p.length-1];const li=p.reduce((a,b)=>b.close<a.close?b:a);const dd=last.close/peak-1;return [{drawdown:dd,peak,last:last.close,last_date:last.date,low_close:li.close,low_date:li.date}];}});
+
+dash.draw('phasebar',(el)=>{
+const ph=dash.data('phase'),hg=dash.data('high52');
+const MILESTONES=[-0.08,-0.15];
+const r=ph.data[0],peak=Number(r.peak),low=Number(hg.data[0].low),lowdd=low/peak-1,mdd=Math.min(lowdd,r.drawdown,d3.min(MILESTONES));
+const price=(p)=>peak*(1+p);
+const W=Math.max(260,el.clientWidth),H=104,ml=2,mr=2,by=52,bh=12;
+const x=d3.scaleLinear([mdd,0],[ml,W-mr]).clamp(true);
+const dd=Math.max(mdd,Math.min(0,r.drawdown));
+const tip=mkTip();
+const svg=d3.create('svg').attr('viewBox',`0 0 ${W} ${H}`).attr('role','img').attr('aria-label',`VWCE market phase. Scale from the 52-week low of ${fmt('eur2',low)}, ${fmt('pct1s',lowdd)} from the high, to the 52-week high of ${fmt('eur2',peak)}. VWCE is at ${fmt('eur2',r.last)}, ${fmt('pct1s',r.drawdown)} from the high.`).style('touch-action','pan-y');
+const GC=['#ff5ec4','#b39dff','#b39dff','#4fd18b'],GO=[0,0.45,0.88,1];
+const gcol=d3.scaleLinear(GO.map((o)=>mdd*(1-o)),GC).interpolate(d3.interpolateLab).clamp(true);
+const lg=svg.append('defs').append('linearGradient').attr('id','pv-phase-grad').attr('gradientUnits','userSpaceOnUse').attr('x1',x(mdd)).attr('x2',W-mr).attr('y1',0).attr('y2',0);
+GC.forEach((c,i)=>lg.append('stop').attr('offset',GO[i]).attr('stop-color',c));
+svg.append('rect').attr('x',ml).attr('y',by).attr('width',W-ml-mr).attr('height',bh).attr('rx',bh/2).style('fill','var(--cds-chart-muted)').style('opacity',0.4);
+svg.append('rect').attr('x',x(dd)).attr('y',by).attr('width',Math.max(0,W-mr-x(dd))).attr('height',bh).attr('rx',bh/2).style('fill','url(#pv-phase-grad)');
+MILESTONES.forEach((m)=>{const mxx=x(m);svg.append('line').attr('x1',mxx).attr('x2',mxx).attr('y1',by+bh+2).attr('y2',by+bh+7).style('stroke','var(--color-fg-muted)').attr('stroke-width',1);const a=mxx<ml+30?'start':mxx>W-mr-30?'end':'middle';svg.append('text').attr('class','pv-tick').attr('data-ms',1).attr('x',mxx).attr('y',by+bh+19).attr('text-anchor',a).text(fmt('pct0s',m));svg.append('text').attr('class','pv-name').attr('data-ms',1).attr('x',mxx).attr('y',by+bh+34).attr('text-anchor',a).text(fmt('eur2',price(m)));});
+const lx0=x(lowdd);
+const lowV=svg.append('text').attr('class','pv-val').attr('x',lx0).attr('y',by+bh+19).text(`${fmt('pct1s',lowdd)} · ${fmt('eur2',low)}`);
+const lowC=svg.append('text').attr('class','pv-tick').attr('x',lx0).attr('y',by+bh+34).text('52-week low · '+fullFmt(hg.data[0].low_date));
+const hiV=svg.append('text').attr('class','pv-val').attr('x',W-mr).attr('y',by+bh+19).attr('text-anchor','end').text(fmt('eur2',peak));
+const hiC=svg.append('text').attr('class','pv-tick').attr('x',W-mr).attr('y',by+bh+34).attr('text-anchor','end').text('52-week high · '+fullFmt(hg.data[0].peak_date));
+const mx=x(dd);
+const labs=[svg.append('text').attr('class','pv-tick').attr('y',by-38).text(`Last · ${fullFmt(r.last_date)}`),svg.append('text').attr('y',by-14).style('font-family','var(--font-anthropic-serif)').style('font-size','22px').style('fill','var(--color-fg)').text(`${fmt('pct1s',r.drawdown)} · ${fmt('eur2',r.last)}`)];
+svg.append('circle').attr('cx',mx).attr('cy',by+bh/2).attr('r',10).style('fill','var(--color-panel)').style('stroke',gcol(dd)).attr('stroke-width',3);
+const hl=svg.append('line').attr('y1',by-4).attr('y2',by+bh+4).style('stroke','var(--color-fg-muted)').attr('stroke-width',1).attr('visibility','hidden');
+const hide=()=>{hl.attr('visibility','hidden');tip.hidden=true;};
+const move=(ev)=>{const px=Math.max(ml,Math.min(W-mr,d3.pointer(ev,svg.node())[0]));const p=x.invert(px);hl.attr('x1',px).attr('x2',px).attr('visibility','visible');showTip(el,tip,[`${fmt('pct1s',p)} · ${fmt('eur2',price(p))}`],px,by);};
+svg.append('rect').attr('x',0).attr('y',by-14).attr('width',W).attr('height',bh+28).style('fill','transparent').on('pointermove pointerdown',move).on('pointerleave',(ev)=>{if(isMouse(ev))hide();});el._dismiss=hide;
+el.replaceChildren(svg.node(),tip);
+const lowR=lx0+Math.max(lowV.node().getComputedTextLength()||0,lowC.node().getComputedTextLength()||0);
+const clash=svg.selectAll('[data-ms]').nodes().some((n)=>{const b=n.getBBox();return b.x<lowR+8&&b.x+b.width>lx0-8;});
+const hiL=W-mr-Math.max(hiV.node().getComputedTextLength()||0,hiC.node().getComputedTextLength()||0);
+const clashHi=svg.selectAll('[data-ms]').nodes().some((n)=>{const b=n.getBBox();return b.x+b.width>hiL-8;});
+if(clash){lowV.attr('y',by+bh+54);lowC.attr('y',by+bh+69);}
+if(clashHi){hiV.attr('y',by+bh+54);hiC.attr('y',by+bh+69);}
+if(clash||clashHi)svg.attr('viewBox',`0 0 ${W} ${by+bh+75}`);
+labs.forEach((lab)=>{const lw=lab.node().getComputedTextLength()||0;lab.attr('x',Math.max(ml,Math.min(W-mr-lw,mx-lw/2)));});
+});
+
+dash.draw('ftseregions',(el)=>{
+const s=dash.data('ftse_regions');
+const all=s.data.map((d)=>({...d,w:Number(d.weight)}));
+const rows=all.filter((d)=>d.region!=='Others').sort((a,b)=>b.w-a.w).concat(all.filter((d)=>d.region==='Others'));
+const COLORS={'United States':'var(--pv-accent)','Developed Europe':'#7aa7ff','Emerging markets':'#5fd3b0','Japan':'#ffb86b','Others':'#55544f'};
+const col=(r)=>COLORS[r]||'#55544f';
+const W=Math.max(240,el.clientWidth),H=30,gap=2;
+const total=d3.sum(rows,(d)=>d.w);
+const xs=d3.scaleLinear([0,total],[0,W]);
+const tip=mkTip();
+const svg=d3.create('svg').attr('viewBox',`0 0 ${W} ${H}`).attr('role','img').attr('aria-label','Geographic breakdown of the FTSE All-World Index: '+rows.map((d)=>`${d.region} ${fmt('pct1',d.w)}`).join(', '));
+const segs=[],items=[],texts=[];
+let acc=0;
+const lg=document.createElement('ul');lg.className='pv-seg-legend';
+const focus=(i)=>{segs.forEach((s,j)=>s.style('opacity',j===i?1:0.35));items.forEach((li,j)=>li.classList.toggle('is-dim',j!==i));};
+const reset=()=>{segs.forEach((s)=>s.style('opacity',1));items.forEach((li)=>li.classList.remove('is-dim'));tip.hidden=true;};
+rows.forEach((d,i)=>{
+const x0=xs(acc)+(i?gap/2:0),x1=xs(acc+d.w)-(i<rows.length-1?gap/2:0),w=Math.max(1,x1-x0);acc+=d.w;
+const s=svg.append('rect').attr('x',x0).attr('y',0).attr('width',w).attr('height',H).attr('rx',4).style('fill',col(d.region)).attr('tabindex',0).style('cursor','pointer').on('pointerenter focus',()=>{focus(i);showTip(el,tip,[d.region,fmt('pct1',d.w)+' of the index'],x0+w/2,0);}).on('pointerleave',(ev)=>{if(isMouse(ev))reset();}).on('blur',reset);
+segs.push(s);
+texts.push({t:svg.append('text').attr('x',x0+8).attr('y',H/2+4).style('font-size','12px').style('font-weight','600').style('pointer-events','none').style('fill',d.region==='Others'?'#ffffff':'#0b0b0b').text(fmt('pct0s',d.w).replace('+','')),w});
+const li=document.createElement('li');li.tabIndex=0;const sw=document.createElement('i');sw.style.background=col(d.region);const nm=document.createElement('span');nm.textContent=d.region;const v=document.createElement('b');v.textContent=fmt('pct1',d.w);li.append(sw,nm,v);li.addEventListener('pointerenter',()=>focus(i));li.addEventListener('pointerleave',(ev)=>{if(isMouse(ev))reset();});li.addEventListener('focus',()=>focus(i));li.addEventListener('blur',reset);items.push(li);lg.append(li);
+});
+el.replaceChildren(svg.node(),lg,tip);el._dismiss=reset;
+texts.forEach(({t,w})=>{const tw=t.node().getComputedTextLength()||0;if(tw+14>w)t.remove();});
+});
+
+dash.draw('ftseddcards',(el)=>{
+const s=dash.data('ftse_dd');
+const rows=s.data.map((d)=>({...d,dd:Number(d.drawdown)})).sort((a,b)=>a.dd-b.dd);
+const p=(cls,text)=>{const e=document.createElement('p');e.className=cls;e.textContent=text;return e;};
+el.replaceChildren(...rows.map((d)=>{const c=document.createElement('section');c.className='pv-card';c.append(p('pv-label',d.episode),p('pv-value',fmt('pct1s',d.dd)),p('pv-sub',d.period),p('pv-sub',d.basis));return c;}));
+});
+
+dash.draw('pricechart',(el)=>{
+const mo=dash.data('monitor');
+const parse=d3.utcParse('%Y-%m-%d');
+let rows=DATA.prices.map((d)=>({t:parse(d.date),c:Number(d.close),iso:d.date})).filter((d)=>d.t&&Number.isFinite(d.c)).sort((a,b)=>a.t-b.t);
+const m=mo.data[0],peak=m.peak,last=rows[rows.length-1],pt=parse(m.peak_date);
+const RG=pvRange();
+if(RG==='2y'){const f=rows[0].t;rows=DATA.prices_weekly.map((d)=>({t:parse(d.date),c:Number(d.close),iso:d.date,wk:1})).filter((d)=>d.t&&Number.isFinite(d.c)&&d.t<f).sort((a,b)=>a.t-b.t).concat(rows);}
+const t0=RG==='1m'?d3.utcMonth.offset(last.t,-1):RG==='ytd'?d3.utcYear.floor(last.t):RG==='2y'?d3.utcYear.offset(last.t,-2):d3.utcYear.offset(last.t,-1);
+rows=rows.filter((d)=>d.t>=t0);
+const W=Math.max(260,el.clientWidth),H=W<480?230:280,ml=40,mr=76,mt=16,mb=24,lx=W-mr+8;
+const x=d3.scaleUtc([rows[0].t,last.t],[ml,W-mr]);
+const y=d3.scaleLinear([Math.floor(d3.min(rows,(d)=>d.c)-2),Math.ceil(peak+1)],[H-mb,mt]);
+const tip=mkTip();
+const svg=d3.create('svg').attr('viewBox',`0 0 ${W} ${H}`).attr('role','img').attr('aria-label',`Line chart of VWCE closes, ${RG.toUpperCase()} view. Last close ${fmt('eur2',last.c)} on ${fullFmt(last.iso)}, ${fmt('pct1s',m.from_peak)} vs the 52-week high of ${fmt('eur2',peak)} set on ${fullFmt(m.peak_date)}.`).style('touch-action','pan-y');
+y.ticks(5).forEach((v)=>{svg.append('line').attr('x1',ml).attr('x2',W-mr).attr('y1',y(v)).attr('y2',y(v)).style('stroke','var(--cds-chart-grid)').attr('stroke-width',1);svg.append('text').attr('class','pv-tick').attr('x',ml-6).attr('y',y(v)+4).attr('text-anchor','end').text(fmt('eur0',v));});
+const xf=d3.utcFormat(RG==='1m'?'%d %b':'%b %Y');
+x.ticks(Math.max(2,Math.floor((W-ml-mr)/95))).forEach((v)=>{svg.append('text').attr('class','pv-tick').attr('x',x(v)).attr('y',H-6).attr('text-anchor','middle').text(xf(v));});
+[0.05,0.1].forEach((b)=>{const v=peak*(1-b);svg.append('line').attr('x1',ml).attr('x2',W-mr).attr('y1',y(v)).attr('y2',y(v)).style('stroke','var(--cds-chart-axis)').attr('stroke-width',1);svg.append('text').attr('class','pv-tick').attr('x',ml+6).attr('y',y(v)-5).text('−'+Math.round(b*100)+'%');});
+svg.append('line').attr('x1',ml).attr('x2',W-mr).attr('y1',y(peak)).attr('y2',y(peak)).style('stroke','var(--cds-chart-reference)').attr('stroke-width',1.5);
+svg.append('text').attr('class','pv-name').attr('x',lx).attr('y',y(peak)-3).text('52-wk high');
+svg.append('text').attr('class','pv-val').attr('x',lx).attr('y',y(peak)+12).text(fmt('eur2',peak));
+svg.append('path').attr('d',d3.line().x((d)=>x(d.t)).y((d)=>y(d.c))(rows)).style('fill','none').style('stroke','var(--pv-accent)').attr('stroke-width',2).attr('stroke-linejoin','round').attr('stroke-linecap','round');
+if(pt>=rows[0].t){svg.append('circle').attr('cx',x(pt)).attr('cy',y(peak)).attr('r',4).style('fill','var(--cds-chart-muted)').style('stroke','var(--color-panel)').attr('stroke-width',2);
+svg.append('text').attr('class','pv-tick').attr('x',x(pt)).attr('y',y(peak)-9).attr('text-anchor','middle').text(dayFmt(m.peak_date));}
+svg.append('circle').attr('cx',x(last.t)).attr('cy',y(last.c)).attr('r',5).style('fill','var(--pv-accent)').style('stroke','var(--color-panel)').attr('stroke-width',2);
+svg.append('text').attr('class','pv-name').attr('x',lx+2).attr('y',y(last.c)-3).text(dayFmt(last.iso));
+svg.append('text').attr('class','pv-val').attr('x',lx+2).attr('y',y(last.c)+12).text(fmt('eur2',last.c));
+const vl=svg.append('line').attr('y1',mt).attr('y2',H-mb).style('stroke','var(--cds-chart-axis)').attr('stroke-width',1).attr('visibility','hidden');
+const dot=svg.append('circle').attr('r',5).style('fill','var(--pv-accent)').style('stroke','var(--color-panel)').attr('stroke-width',2).attr('visibility','hidden');
+const bis=d3.bisector((d)=>d.t).center;
+const hide=()=>{vl.attr('visibility','hidden');dot.attr('visibility','hidden');tip.hidden=true;};
+const move=(ev)=>{const px=d3.pointer(ev,svg.node())[0];const d=rows[bis(rows,x.invert(Math.max(ml,Math.min(W-mr,px))))];const cx=x(d.t),cy=y(d.c);vl.attr('x1',cx).attr('x2',cx).attr('visibility','visible');dot.attr('cx',cx).attr('cy',cy).attr('visibility','visible');showTip(el,tip,[fullFmt(d.iso),(d.wk?'VWCE weekly close ':'VWCE close ')+fmt('eur2',d.c),fmt('pct1s',d.c/peak-1)+' vs the current 52-week high'],cx,cy);};
+svg.append('rect').attr('x',ml).attr('y',mt).attr('width',W-ml-mr).attr('height',H-mt-mb).style('fill','transparent').on('pointermove pointerdown',move).on('pointerleave',(ev)=>{if(isMouse(ev))hide();});el._dismiss=hide;
+el.replaceChildren(svg.node(),tip);
+});
+
+document.querySelectorAll('[data-draw]').forEach((el)=>{const f=DRAWS[el.dataset.draw];if(f)f(el);});
+</script>
+</body>
+</html>
